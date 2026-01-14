@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星空治愈粒子 | 解压小游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial Rounded MT Bold', 'Arial', sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, #0a0a2a 0%, #000000 100%);
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .header {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        h1 {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #9AD2E9, #D4F0F6, #FAF5D0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(154, 210, 233, 0.5);
+            letter-spacing: 2px;
+        }
+        
+        .subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #9AD2E9;
+            font-weight: 300;
+        }
+        
+        .instructions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 1.1rem;
+            color: #D4F0F6;
+        }
+        
+        .color-scheme-info {
+            margin-top: 15px;
+            font-size: 1rem;
+            color: #FAF5D0;
+            padding: 10px;
+            border-radius: 10px;
+            background-color: rgba(57, 135, 168, 0.3);
+        }
+        
+        .current-color {
+            font-weight: bold;
+            color: #FAF5D0;
+        }
+        
+        .footer {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            padding: 10px;
+        }
+        
+        .particle-count {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 1rem;
+            color: #D4F0F6;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .theme-dots {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .theme-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        
+        .theme-dot:hover {
+            transform: scale(1.2);
+            border-color: white;
+        }
+        
+        .theme-dot.active {
+            border-color: white;
+            transform: scale(1.2);
+            box-shadow: 0 0 10px white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>嘿，咱们一起放烟花吧。</h1>
+        <div class="subtitle">鼠标滑过屏幕，体验流星烟花与水晶音效</div>
+        <div class="instructions">
+            <div>✨ 移动鼠标创建治愈粒子效果</div>
+            <div>💖 你已经很棒了，是时候休息一下了</div>
+            <div>🎨 按 <kbd>Enter</kbd> 键或点击上方色点切换配色方案</div>
+            <div>🌌 粒子会自动消失，保持画面清新</div>
+        </div>
+        <div class="color-scheme-info">
+            当前配色: <span class="current-color" id="current-color-name">浅浅月光</span>
+        </div>
+    </div>
+    
+    <div class="theme-dots" id="theme-dots"></div>
+    
+    <div class="particle-count">
+        粒子数: <span id="particle-count">0</span>
+    </div>
+    
+    <canvas id="particleCanvas"></canvas>
+    
+    <div class="footer">
+        放松心情，享受这治愈时刻 | 每个粒子都是独特的生命，轻轻滑过，绽放然后消逝
+    </div>
+
+    <script>
+        // 获取Canvas元素和上下文
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置Canvas尺寸为窗口大小
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // 存储所有粒子
+        let particles = [];
+        // 粒子计数器
+        let particleCount = 0;
+        
+        // 定义配色方案
+        const colorSchemes = [
+            {
+                name: "浅浅月光",
+                colors: ["#3987A8", "#6DB9D9", "#9AD2E9", "#D4F0F6", "#FAF5D0"],
+                bgGradient: ["#0a0a2a", "#000000"]
+            },
+            {
+                name: "乌斯怀亚",
+                colors: ["#0081D1", "#76BCEF", "#DFDFF0", "#D6DFF1", "#81A2D0"],
+                bgGradient: ["#0a1a2a", "#000010"]
+            },
+            {
+                name: "暖暖记忆",
+                colors: ["#AA0C1D", "#E20000", "#D4AF73", "#FBF9E2", "#FBD997"],
+                bgGradient: ["#2a0a0a", "#100000"]
+            },
+            {
+                name: "欢庆时刻",
+                colors: ["#B60000", "#EC0000", "#FFBF36", "#FEE9DC", "#FCEBA3"],
+                bgGradient: ["#2a0a14", "#100005"]
+            },
+            {
+                name: "万物新生",
+                colors: ["#08739D", "#4984AC", "#E7EEF8", "#6D9D39", "#AEC60C"],
+                bgGradient: ["#0a2a1a", "#001005"]
+            }
+        ];
+        
+        // 当前配色方案索引
+        let currentColorScheme = 0;
+        
+        // 创建音频上下文和音效
+        let audioContext;
+        let gainNode;
+        
+        // 初始化音频
+        function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                gainNode = audioContext.createGain();
+                gainNode.connect(audioContext.destination);
+                gainNode.gain.value = 0.3; // 设置音量
+            } catch (e) {
+                console.log("Web Audio API 不支持或已禁用");
+            }
+        }
+        
+        // 播放水晶音效
+        function playCrystalSound(x, y) {
+            if (!audioContext) return;
+            
+            // 根据鼠标位置调整音高
+            const pitch = 300 + (y / canvas.height) * 500;
+            
+            // 创建振荡器
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = pitch;
+            
+            // 创建增益节点用于音量包络
+            const volume = audioContext.createGain();
+            volume.gain.setValueAtTime(0, audioContext.currentTime);
+            volume.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+            volume.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1);
+            
+            // 连接节点
+            oscillator.connect(volume);
+            volume.connect(gainNode);
+            
+            // 播放并停止音效
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 1);
+        }
+        
+        // 粒子类
+        class Particle {
+            constructor(x, y, colorScheme) {
+                this.x = x;
+                this.y = y;
+                this.colorScheme = colorScheme;
+                this.color = this.getRandomColor();
+                this.size = Math.random() * 8 + 2;
+                this.speedX = (Math.random() * 6 - 3) * (Math.random() > 0.5 ? 1 : -1);
+                this.speedY = (Math.random() * 6 - 3) * (Math.random() > 0.5 ? 1 : -1);
+                this.life = 1.0; // 粒子生命周期 (1.0 到 0.0)
+                this.decay = Math.random() * 0.02 + 0.005; // 衰减速度
+                this.trail = [];
+                this.maxTrailLength = Math.floor(Math.random() * 10) + 5;
+                this.type = Math.random() > 0.5 ? 'star' : 'sparkle'; // 粒子类型
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() * 0.1 - 0.05);
+                
+                // 对于烟花型粒子，添加更快的速度和更多的初始能量
+                if (Math.random() > 0.7) {
+                    this.type = 'firework';
+                    this.speedX *= 2;
+                    this.speedY *= 2;
+                    this.size *= 1.5;
+                }
+                
+                particleCount++;
+            }
+            
+            getRandomColor() {
+                const colors = colorSchemes[this.colorScheme].colors;
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            update() {
+                // 添加重力效果
+                this.speedY += 0.05;
+                
+                // 更新位置
+                this.x += this.speedX;
+                this.y += this.speedY;
+                
+                // 添加空气阻力
+                this.speedX *= 0.99;
+                this.speedY *= 0.99;
+                
+                // 更新生命周期
+                this.life -= this.decay;
+                
+                // 更新旋转
+                this.rotation += this.rotationSpeed;
+                
+                // 添加位置到轨迹
+                this.trail.push({x: this.x, y: this.y, size: this.size * this.life});
+                if (this.trail.length > this.maxTrailLength) {
+                    this.trail.shift();
+                }
+                
+                // 如果粒子超出屏幕边界，反弹或消失
+                if (this.x < 0 || this.x > canvas.width) {
+                    this.speedX *= -0.8;
+                    this.x = this.x < 0 ? 0 : canvas.width;
+                }
+                
+                if (this.y < 0 || this.y > canvas.height) {
+                    this.speedY *= -0.8;
+                    this.y = this.y < 0 ? 0 : canvas.height;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                
+                // 绘制轨迹
+                if (this.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    
+                    for (let i = 1; i < this.trail.length; i++) {
+                        const point = this.trail[i];
+                        ctx.lineTo(point.x, point.y);
+                    }
+                    
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = this.size * 0.5;
+                    ctx.globalAlpha = this.life * 0.5;
+                    ctx.stroke();
+                }
+                
+                // 绘制粒子主体
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                
+                if (this.type === 'star') {
+                    // 绘制星星
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation);
+                    
+                    const spikes = 5;
+                    const outerRadius = this.size;
+                    const innerRadius = this.size * 0.5;
+                    
+                    ctx.beginPath();
+                    let angle = Math.PI / 2 * 3;
+                    let x, y;
+                    
+                    for (let i = 0; i < spikes; i++) {
+                        x = Math.cos(angle) * outerRadius;
+                        y = Math.sin(angle) * outerRadius;
+                        ctx.lineTo(x, y);
+                        angle += Math.PI / spikes;
+                        
+                        x = Math.cos(angle) * innerRadius;
+                        y = Math.sin(angle) * innerRadius;
+                        ctx.lineTo(x, y);
+                        angle += Math.PI / spikes;
+                    }
+                    
+                    ctx.lineTo(0, -outerRadius);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // 添加星星光晕
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * 1.5, 0, Math.PI * 2);
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size * 1.5);
+                    gradient.addColorStop(0, this.color + "80");
+                    gradient.addColorStop(1, this.color + "00");
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    
+                } else if (this.type === 'firework') {
+                    // 绘制烟花
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 烟花爆炸效果
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (Math.PI * 2 / 8) * i;
+                        const sparkLength = this.size * 2;
+                        const sparkX = this.x + Math.cos(angle) * sparkLength;
+                        const sparkY = this.y + Math.sin(angle) * sparkLength;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(sparkX, sparkY);
+                        ctx.lineWidth = this.size * 0.3;
+                        ctx.strokeStyle = this.color;
+                        ctx.stroke();
+                    }
+                    
+                    // 烟花光晕
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 3, 0, Math.PI * 2);
+                    const gradient = ctx.createRadialGradient(
+                        this.x, this.y, 0,
+                        this.x, this.y, this.size * 3
+                    );
+                    gradient.addColorStop(0, this.color + "60");
+                    gradient.addColorStop(1, this.color + "00");
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    
+                } else {
+                    // 绘制普通闪烁粒子
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 添加闪烁效果
+                    if (Math.random() > 0.7) {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2);
+                        const gradient = ctx.createRadialGradient(
+                            this.x, this.y, 0,
+                            this.x, this.y, this.size * 1.5
+                        );
+                        gradient.addColorStop(0, this.color + "80");
+                        gradient.addColorStop(1, this.color + "00");
+                        ctx.fillStyle = gradient;
+                        ctx.fill();
+                    }
+                }
+                
+                ctx.restore();
+            }
+            
+            // 检查粒子是否应该被移除
+            isAlive() {
+                return this.life > 0;
+            }
+            
+            // 当粒子被移除时减少计数器
+            destroy() {
+                particleCount--;
+            }
+        }
+        
+        // 创建粒子
+        function createParticles(x, y, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, currentColorScheme));
+            }
+            // 播放水晶音效
+            playCrystalSound(x, y);
+        }
+        
+        // 动画循环
+        function animate() {
+            // 清除画布并设置背景
+            const bgGradient = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, canvas.width
+            );
+            const colors = colorSchemes[currentColorScheme].bgGradient;
+            bgGradient.addColorStop(0, colors[0]);
+            bgGradient.addColorStop(1, colors[1]);
+            
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 添加一些背景星星
+            drawBackgroundStars();
+            
+            // 更新和绘制所有粒子
+            for (let i = 0; i < particles.length; i++) {
+                const particle = particles[i];
+                particle.update();
+                particle.draw();
+                
+                // 移除生命周期结束的粒子
+                if (!particle.isAlive()) {
+                    particle.destroy();
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+            
+            // 更新粒子计数器显示
+            document.getElementById('particle-count').textContent = particleCount;
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 绘制背景星星
+        function drawBackgroundStars() {
+            const starCount = 100;
+            const starColors = colorSchemes[currentColorScheme].colors;
+            
+            for (let i = 0; i < starCount; i++) {
+                // 只在第一次绘制时生成星星位置
+                if (!window.starPositions) {
+                    window.starPositions = [];
+                    for (let j = 0; j < starCount; j++) {
+                        window.starPositions.push({
+                            x: Math.random() * canvas.width,
+                            y: Math.random() * canvas.height,
+                            size: Math.random() * 1.5 + 0.5,
+                            twinkle: Math.random() * 0.5 + 0.5,
+                            speed: Math.random() * 0.02 + 0.01
+                        });
+                    }
+                }
+                
+                const star = window.starPositions[i];
+                
+                // 计算闪烁效果
+                const twinkle = Math.sin(Date.now() * star.speed) * 0.3 + 0.7;
+                
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size * twinkle, 0, Math.PI * 2);
+                ctx.fillStyle = starColors[Math.floor(Math.random() * starColors.length)] + "80";
+                ctx.fill();
+            }
+        }
+        
+        // 切换配色方案
+        function switchColorScheme() {
+            currentColorScheme = (currentColorScheme + 1) % colorSchemes.length;
+            updateColorSchemeDisplay();
+        }
+        
+        // 更新配色方案显示
+        function updateColorSchemeDisplay() {
+            document.getElementById('current-color-name').textContent = colorSchemes[currentColorScheme].name;
+            
+            // 更新主题点活动状态
+            const dots = document.querySelectorAll('.theme-dot');
+            dots.forEach((dot, index) => {
+                if (index === currentColorScheme) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+        
+        // 创建主题色点
+        function createThemeDots() {
+            const container = document.getElementById('theme-dots');
+            
+            colorSchemes.forEach((scheme, index) => {
+                const dot = document.createElement('div');
+                dot.className = `theme-dot ${index === currentColorScheme ? 'active' : ''}`;
+                dot.style.backgroundColor = scheme.colors[2];
+                dot.title = scheme.name;
+                dot.addEventListener('click', () => {
+                    currentColorScheme = index;
+                    updateColorSchemeDisplay();
+                });
+                container.appendChild(dot);
+            });
+        }
+        
+        // 事件监听器
+        function initEventListeners() {
+            // 鼠标移动事件
+            let mouseX = 0;
+            let mouseY = 0;
+            let mouseMoveTimer = null;
+            
+            canvas.addEventListener('mousemove', (e) => {
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                
+                // 使用防抖技术减少粒子创建频率
+                if (!mouseMoveTimer) {
+                    mouseMoveTimer = setTimeout(() => {
+                        createParticles(mouseX, mouseY);
+                        mouseMoveTimer = null;
+                    }, 30); // 每30ms创建一次粒子
+                }
+            });
+            
+            // 触摸移动事件（移动设备支持）
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                mouseX = touch.clientX;
+                mouseY = touch.clientY;
+                
+                if (!mouseMoveTimer) {
+                    mouseMoveTimer = setTimeout(() => {
+                        createParticles(mouseX, mouseY, 10); // 移动设备上创建较少粒子
+                        mouseMoveTimer = null;
+                    }, 50);
+                }
+            }, { passive: false });
+            
+            // 切换配色方案
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    switchColorScheme();
+                }
+            });
+            
+            // 窗口大小调整
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                // 清除星星位置，以便重新生成适应新尺寸
+                window.starPositions = null;
+            });
+            
+            // 阻止上下文菜单
+            canvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+        }
+        
+        // 初始化
+        function init() {
+            initAudio();
+            initEventListeners();
+            createThemeDots();
+            animate();
+            
+            // 初始创建一些粒子
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => {
+                    createParticles(
+                        Math.random() * canvas.width,
+                        Math.random() * canvas.height,
+                        Math.floor(Math.random() * 10) + 5
+                    );
+                }, i * 300);
+            }
+        }
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
